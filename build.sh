@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Configuration
 KERNEL_REPO="https://github.com/srbh-Testing/android_kernel_realme_nashc"
 DEFCONFIG="nashc_defconfig"
 
@@ -9,10 +8,8 @@ sudo apt-get update -y
 sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev libncursesw5-dev \
                         git zip unzip ccache gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi curl
 
-echo "=== 2. Downloading Clang 20 Toolchain (r547379) ==="
-mkdir -p clang
-curl -s https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz | tar -xz -C clang || \
-git clone --depth=1 https://gitlab.com/panchajanya1999/azure-clang.git clang
+echo "=== 2. Downloading ZyC Clang 20 ==="
+git clone --depth=1 https://gitlab.com/zyc-project/zyc-clang.git clang
 
 echo "=== 3. Cloning Kernel Source ==="
 git clone --depth=1 $KERNEL_REPO source
@@ -28,19 +25,17 @@ echo "=== 4. Setting Up Environment ==="
 export PATH="$(pwd)/../clang/bin:$PATH"
 export ARCH=arm64
 export SUBARCH=arm64
-export CC=clang
-export LLVM=1
-export LLVM_IAS=1
-export CROSS_COMPILE=aarch64-linux-gnu-
-export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+# Force Host to use system GCC to avoid linker mismatches
+export KBUILD_COMPILER_STRING="$(clang --version | head -n 1)"
 
 mkdir -p out
 
 echo "=== 5. Generating Defconfig ==="
-make O=out $DEFCONFIG
+make O=out ARCH=arm64 CC=clang HOSTCC=gcc HOSTCXX=g++ CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- $DEFCONFIG
 
 echo "=== 6. Compiling Kernel ==="
-make -j$(nproc --all) O=out
+make -j$(nproc --all) O=out ARCH=arm64 CC=clang HOSTCC=gcc HOSTCXX=g++ CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
 if [ -f "out/arch/arm64/boot/Image.gz-dtb" ] || [ -f "out/arch/arm64/boot/Image.gz" ]; then
     echo "=== SUCCESS: Kernel Build Complete! ==="
